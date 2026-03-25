@@ -1,0 +1,17 @@
+{
+  "drugbank_path": "",
+  "morgan_radius": 2,
+  "morgan_bits": 256,
+  "hidden_dim": 128,
+  "embedding_dim": 64,
+  "num_gnn_layers": 2,
+  "dropout": 0.3,
+  "architecture": "sage",
+  "lr": 0.001,
+  "weight_decay": 1e-05,
+  "epochs": 100,
+  "neg_ratio": 1,
+  "val_ratio": 0.1,
+  "test_ratio": 0.1,
+  "output_dir": "./drug_gnn_artifacts"
+}

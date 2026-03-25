@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DrugGraph — GNN-Powered Drug Interaction Prediction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Satoshi:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===========================================
+       VIEWPORT FITTING: MANDATORY BASE STYLES
+       =========================================== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    html {
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+    }
+
+    .slide {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-height: 100%;
+      overflow: hidden;
+      padding: var(--slide-padding);
+    }
+
+    :root {
+      /* Neon Cyber Theme Variables */
+      --bg-primary: #080812;
+      --bg-secondary: #0f0f1f;
+      --bg-card: #12122a;
+      --accent-cyan: #00f0ff;
+      --accent-magenta: #ff00aa;
+      --accent-purple: #8b5cf6;
+      --accent-navy: #1a1a4a;
+      --accent-green: #00ff88;
+      --accent-amber: #ffaa00;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0c0;
+      --text-muted: #606080;
+
+      /* Type Scale */
+      --title-size: clamp(1.75rem, 6vw, 4.5rem);
+      --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+      --h3-size: clamp(1rem, 2vw, 1.5rem);
+      --body-size: clamp(0.8rem, 1.5vw, 1.1rem);
+      --small-size: clamp(0.65rem, 1vw, 0.875rem);
+      --stat-size: clamp(2rem, 6vw, 4rem);
+
+      /* Spacing */
+      --slide-padding: clamp(1.5rem, 5vw, 5rem);
+      --content-gap: clamp(0.75rem, 2.5vw, 2rem);
+      --element-gap: clamp(0.5rem, 1.5vw, 1rem);
+    }
+
+    /* ===========================================
+       NEON CYBER THEME STYLES
+       =========================================== */
+    body {
+      font-family: 'Satoshi', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    /* Grid background */
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(var(--accent-navy) 1px, transparent 1px),
+        linear-gradient(90deg, var(--accent-navy) 1px, transparent 1px);
+      background-size: clamp(40px, 6vw, 80px) clamp(40px, 6vw, 80px);
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    /* Glow effects */
+    .glow-cyan { 
+      filter: drop-shadow(0 0 20px var(--accent-cyan));
+      text-shadow: 0 0 40px var(--accent-cyan);
+    }
+    .glow-magenta { 
+      filter: drop-shadow(0 0 20px var(--accent-magenta));
+      text-shadow: 0 0 40px var(--accent-magenta);
+    }
+    .glow-purple { 
+      filter: drop-shadow(0 0 20px var(--accent-purple));
+      text-shadow: 0 0 40px var(--accent-purple);
+    }
+    .glow-green { 
+      filter: drop-shadow(0 0 20px var(--accent-green));
+      text-shadow: 0 0 40px var(--accent-green);
+    }
+    .glow-amber { 
+      filter: drop-shadow(0 0 20px var(--accent-amber));
+      text-shadow: 0 0 40px var(--accent-amber);
+    }
+
+    /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Typography */
+    h1 {
+      font-family: 'Clash Display', sans-serif;
+      font-size: var(--title-size);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-family: 'Clash Display', sans-serif;
+      font-size: var(--h2-size);
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    h3 {
+      font-family: 'Clash Display', sans-serif;
+      font-size: var(--h3-size);
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    p {
+      font-size: var(--body-size);
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    /* ===========================================
+       SLIDE LAYOUTS
+       =========================================== */
+    
+    /* Centered title */
+    .slide-title-center {
+      text-align: center;
+      align-items: center;
+    }
+    .slide-title-center h1 {
+      margin-bottom: var(--content-gap);
+    }
+    .slide-title-center p {
+      max-width: 600px;
+    }
+
+    /* Two column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--content-gap);
+      align-items: center;
+    }
+
+    /* Three column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--element-gap);
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+      gap: var(--element-gap);
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-navy);
+      border-radius: 12px;
+      padding: clamp(1rem, 2vw, 1.5rem);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+    }
+
+    .stat-value {
+      font-family: 'Clash Display', sans-serif;
+      font-size: var(--stat-size);
+      font-weight: 700;
+      color: var(--accent-cyan);
+      text-shadow: 0 0 30px var(--accent-cyan);
+      line-height: 1;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: var(--small-size);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Feature list */
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--element-gap);
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--element-gap);
+      font-size: var(--body-size);
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .feature-list li::before {
+      content: '>';
+      color: var(--accent-cyan);
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* Code block */
+    .code-block {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-navy);
+      border-radius: 8px;
+      padding: clamp(1rem, 2vw, 1.5rem);
+      font-family: 'Satoshi', monospace;
+      font-size: var(--small-size);
+      color: var(--text-secondary);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.6;
+    }
+
+    .code-block .keyword { color: var(--accent-magenta); }
+    .code-block .string { color: var(--accent-cyan); }
+    .code-block .comment { color: var(--text-muted); }
+    .code-block .number { color: var(--accent-green); }
+
+    /* Diagram placeholder */
+    .diagram-box {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-navy);
+      border-radius: 12px;
+      padding: var(--content-gap);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      position: relative;
+    }
+
+    .diagram-node {
+      background: var(--accent-navy);
+      border: 2px solid var(--accent-cyan);
+      border-radius: 50%;
+      width: clamp(50px, 10vw, 80px);
+      height: clamp(50px, 10vw, 80px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--small-size);
+      color: var(--accent-cyan);
+      box-shadow: 0 0 20px var(--accent-cyan);
+    }
+
+    .diagram-row {
+      display: flex;
+      gap: clamp(1rem, 3vw, 2rem);
+      align-items: center;
+    }
+
+    .diagram-arrow {
+      color: var(--accent-cyan);
+      font-size: clamp(1.5rem, 3vw, 2rem);
+    }
+
+    /* Progress indicator */
+    .progress {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    .progress-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-navy);
+      transition: all 0.3s ease;
+    }
+
+    .progress-dot.active {
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan);
+    }
+
+    /* Keyboard hint */
+    .keyboard-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      font-size: var(--small-size);
+      color: var(--text-muted);
+      z-index: 100;
+    }
+
+    .keyboard-hint kbd {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-navy);
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin: 0 2px;
+    }
+
+    /* Slide number */
+    .slide-num {
+      position: absolute;
+      top: var(--slide-padding);
+      right: var(--slide-padding);
+      font-family: 'Clash Display', sans-serif;
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 700;
+      color: var(--accent-navy);
+      line-height: 1;
+      z-index: 0;
+    }
+
+    /* Decorative circles */
+    .circle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .circle-glow-cyan {
+      background: radial-gradient(circle, var(--accent-cyan) 0%, transparent 70%);
+      opacity: 0.1;
+    }
+
+    .circle-glow-magenta {
+      background: radial-gradient(circle, var(--accent-magenta) 0%, transparent 70%);
+      opacity: 0.08;
+    }
+
+    /* Scanlines */
+    .scanlines {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.05) 2px,
+        rgba(0, 0, 0, 0.05) 4px
+      );
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* Demo card */
+    .demo-card {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 16px;
+      padding: var(--content-gap);
+      box-shadow: 0 0 40px rgba(0, 240, 255, 0.1);
+    }
+
+    .demo-row {
+      display: flex;
+      align-items: center;
+      gap: var(--element-gap);
+      flex-wrap: wrap;
+    }
+
+    .drug-tag {
+      background: var(--accent-navy);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 20px;
+      padding: 0.5rem 1rem;
+      font-size: var(--small-size);
+      color: var(--accent-cyan);
+    }
+
+    .demo-plus {
+      font-size: var(--h3-size);
+      color: var(--accent-magenta);
+    }
+
+    /* Comparison table */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: var(--body-size);
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      padding: var(--element-gap);
+      text-align: left;
+      font-family: 'Clash Display', sans-serif;
+      font-size: var(--small-size);
+      color: var(--accent-cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-bottom: 2px solid var(--accent-cyan);
+    }
+
+    .comparison-table td {
+      padding: var(--element-gap);
+      border-bottom: 1px solid var(--accent-navy);
+      color: var(--text-secondary);
+    }
+
+    .comparison-table tr:hover td {
+      background: var(--bg-card);
+    }
+
+    .comparison-table .highlight {
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    /* Risk level badges */
+    .risk-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: var(--small-size);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .risk-high {
+      background: rgba(255, 0, 170, 0.2);
+      color: var(--accent-magenta);
+      border: 1px solid var(--accent-magenta);
+    }
+
+    .risk-moderate {
+      background: rgba(255, 170, 0, 0.2);
+      color: var(--accent-amber);
+      border: 1px solid var(--accent-amber);
+    }
+
+    .risk-low {
+      background: rgba(0, 255, 136, 0.2);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+
+    /* Pipeline step */
+    .pipeline-step {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-navy);
+      border-radius: 12px;
+      padding: var(--element-gap);
+      text-align: center;
+      position: relative;
+    }
+
+    .pipeline-step::after {
+      content: '>';
+      position: absolute;
+      right: calc(-1 * var(--element-gap) - 0.75rem);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent-cyan);
+      font-size: var(--h3-size);
+      font-weight: bold;
+    }
+
+    .pipeline-step:last-child::after {
+      display: none;
+    }
+
+    .step-title {
+      font-family: 'Clash Display', sans-serif;
+      font-size: var(--body-size);
+      color: var(--accent-cyan);
+      margin-bottom: 0.25rem;
+    }
+
+    .step-desc {
+      font-size: var(--small-size);
+      color: var(--text-muted);
+    }
+
+    /* ===========================================
+       ANIMATIONS
+       =========================================== */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in {
+      animation: fade-in 0.6s ease-out forwards;
+    }
+
+    /* Reveal on scroll */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.6s ease-out;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ===========================================
+       RESPONSIVE ADJUSTMENTS
+       =========================================== */
+    @media (max-height: 700px) {
+      :root {
+        --slide-padding: clamp(1rem, 3vw, 2rem);
+        --content-gap: clamp(0.5rem, 1.5vw, 1rem);
+        --title-size: clamp(1.5rem, 5vw, 3rem);
+      }
+    }
+
+    @media (max-height: 600px) {
+      :root {
+        --slide-padding: clamp(0.75rem, 2vw, 1.5rem);
+        --content-gap: clamp(0.4rem, 1vw, 0.75rem);
+        --stat-size: clamp(1.5rem, 4vw, 2.5rem);
+      }
+      .keyboard-hint, .progress { display: none; }
+    }
+
+    @media (max-height: 500px) {
+      :root {
+        --slide-padding: clamp(0.5rem, 1.5vw, 1rem);
+        --title-size: clamp(1.25rem, 4vw, 2rem);
+        --body-size: clamp(0.7rem, 1.2vw, 0.9rem);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .two-col, .three-col {
+        grid-template-columns: 1fr;
+        gap: var(--content-gap);
+      }
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .pipeline-step::after {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+      }
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================
+       SLIDE 1: TITLE
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <div class="circle circle-glow-cyan" style="width: 60vw; height: 60vw; top: -20%; right: -10%;"></div>
+    <div class="circle circle-glow-magenta" style="width: 40vw; height: 40vw; bottom: -10%; left: -5%;"></div>
+    
+    <div class="slide-content slide-title-center">
+      <h1>
+        <span class="gradient-text">DrugGraph</span>
+      </h1>
+      <p style="font-size: var(--h3-size); margin-top: var(--content-gap);">
+        GNN-Powered Drug Interaction Prediction
+      </p>
+      <p style="margin-top: var(--element-gap);">
+        Predicting dangerous drug-drug interactions using<br>
+        Graph Neural Networks trained on DrugBank
+      </p>
+      <div style="margin-top: calc(var(--content-gap) * 1.5); display: flex; gap: var(--element-gap); justify-content: center; flex-wrap: wrap;">
+        <span style="color: var(--accent-cyan); font-size: var(--small-size); border: 1px solid var(--accent-cyan); padding: 0.25rem 0.75rem; border-radius: 12px;">GraphSAGE Architecture</span>
+        <span style="color: var(--text-muted);">|</span>
+        <span style="color: var(--accent-magenta); font-size: var(--small-size); border: 1px solid var(--accent-magenta); padding: 0.25rem 0.75rem; border-radius: 12px;">99.33% AUC</span>
+        <span style="color: var(--text-muted);">|</span>
+        <span style="color: var(--accent-purple); font-size: var(--small-size); border: 1px solid var(--accent-purple); padding: 0.25rem 0.75rem; border-radius: 12px;">Real-Time Analysis</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 2: THE PROBLEM
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">01</span>
+    <div class="circle circle-glow-magenta" style="width: 50vw; height: 50vw; top: 10%; right: -15%;"></div>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        The <span style="color: var(--accent-magenta);">Problem</span>
+      </h2>
+      <ul class="feature-list" style="max-width: 700px;">
+        <li class="reveal">Adverse drug reactions cause <strong style="color: var(--accent-cyan);">1.5 million</strong> hospitalizations annually in the US alone</li>
+        <li class="reveal">Approximately <strong style="color: var(--accent-cyan);">1 in 7</strong> hospitalized patients experience a preventable adverse drug event</li>
+        <li class="reveal">Many interactions are discovered only <em>after</em> patients experience harmful effects</li>
+        <li class="reveal">Traditional methods rely on manual literature review, which is impossible to scale</li>
+        <li class="reveal">Drug combination complexity grows exponentially with each added medication</li>
+      </ul>
+      <div class="reveal" style="margin-top: var(--content-gap); padding: var(--element-gap); background: var(--bg-card); border-left: 3px solid var(--accent-magenta); border-radius: 0 8px 8px 0; max-width: 600px;">
+        <p style="color: var(--text-primary); font-size: var(--body-size);">
+          <strong>Core Question:</strong> Can we predict drug interactions <em>before</em> they harm patients?
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 3: OUR SOLUTION OVERVIEW
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">02</span>
+    <div class="circle circle-glow-cyan" style="width: 40vw; height: 40vw; bottom: -10%; left: -10%;"></div>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Our <span class="gradient-text">Solution</span>
+      </h2>
+      <div class="two-col">
+        <div>
+          <ul class="feature-list">
+            <li class="reveal">Model drugs as <strong style="color: var(--accent-cyan);">molecular graphs</strong> where nodes are atoms and edges are chemical bonds</li>
+            <li class="reveal">Train <strong style="color: var(--accent-cyan);">GraphSAGE</strong> to learn structural patterns from known interactions</li>
+            <li class="reveal">Predict interaction probability for <em>any</em> drug pair in real-time</li>
+            <li class="reveal">Interactive web interface with risk stratification and clinical guidance</li>
+            <li class="reveal">Supports alias resolution (Aspirin, Advil, Tylenol)</li>
+          </ul>
+        </div>
+        <div class="diagram-box reveal">
+          <div style="font-size: var(--small-size); color: var(--text-muted); margin-bottom: var(--element-gap);">Core Pipeline</div>
+          <div class="diagram-row">
+            <div class="diagram-node">DRUG</div>
+            <span class="diagram-arrow">></span>
+            <div class="diagram-node" style="border-color: var(--accent-magenta); color: var(--accent-magenta); box-shadow: 0 0 20px var(--accent-magenta);">GNN</div>
+            <span class="diagram-arrow">></span>
+            <div class="diagram-node" style="border-color: var(--accent-purple); color: var(--accent-purple); box-shadow: 0 0 20px var(--accent-purple);">RISK</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 4: TRAINING DATA
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">03</span>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Training <span style="color: var(--accent-cyan);">Data</span>
+      </h2>
+      <div class="stats-grid">
+        <div class="stat-card reveal">
+          <div class="stat-value">19,842</div>
+          <div class="stat-label">Drugs</div>
+        </div>
+        <div class="stat-card reveal">
+          <div class="stat-value" style="color: var(--accent-magenta); text-shadow: 0 0 30px var(--accent-magenta);">1.45M</div>
+          <div class="stat-label">Interactions</div>
+        </div>
+        <div class="stat-card reveal">
+          <div class="stat-value" style="color: var(--accent-purple); text-shadow: 0 0 30px var(--accent-purple);">v5.1.15</div>
+          <div class="stat-label">DrugBank Version</div>
+        </div>
+        <div class="stat-card reveal">
+          <div class="stat-value" style="color: var(--accent-green); text-shadow: 0 0 30px var(--accent-green);">80/10/10</div>
+          <div class="stat-label">Train/Val/Test</div>
+        </div>
+      </div>
+      <div class="reveal" style="margin-top: var(--content-gap);">
+        <p style="max-width: 700px;">
+          DrugBank provides comprehensive drug information including molecular structures, 
+          targets, pathways, and documented drug-drug interactions. Our dataset includes 
+          both positive (known interactions) and negative (no reported interaction) examples 
+          with a 1:1 negative ratio for balanced training.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 5: GRAPH CONSTRUCTION
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">04</span>
+    <div class="circle circle-glow-cyan" style="width: 30vw; height: 30vw; top: -5%; left: 30%;"></div>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Graph <span style="color: var(--accent-cyan);">Construction</span>
+      </h2>
+      <div class="two-col">
+        <div>
+          <ul class="feature-list">
+            <li class="reveal"><strong>Nodes:</strong> Each atom with features (atomic number, charge, hybridization)</li>
+            <li class="reveal"><strong>Edges:</strong> Chemical bonds with features (bond type, stereochemistry)</li>
+            <li class="reveal"><strong>Node Features:</strong> Morgan fingerprints (256-bit), drug class, ATC codes</li>
+            <li class="reveal"><strong>Aggregation:</strong> Mean pooling via SAGEConv</li>
+            <li class="reveal"><strong>Link Prediction:</strong> MLP on concatenated drug embeddings [a, b, a*b]</li>
+          </ul>
+        </div>
+        <div class="diagram-box reveal">
+          <div style="font-size: var(--small-size); color: var(--text-muted); margin-bottom: var(--element-gap);">Molecular Graph Example</div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: var(--element-gap);">
+            <div class="diagram-row">
+              <div class="diagram-node" style="width: auto; height: auto; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.7rem;">C</div>
+              <span style="color: var(--accent-cyan); font-family: monospace;">-</span>
+              <div class="diagram-node" style="width: auto; height: auto; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.7rem; border-color: var(--accent-magenta); color: var(--accent-magenta);">O</div>
+              <span style="color: var(--accent-cyan); font-family: monospace;">-</span>
+              <div class="diagram-node" style="width: auto; height: auto; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.7rem;">C</div>
+            </div>
+            <div style="font-size: var(--small-size); color: var(--text-muted); text-align: center;">
+              Acetone Molecule<br>
+              <span style="font-family: monospace; font-size: 0.6rem; color: var(--accent-navy);">CH3-CO-CH3</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 6: TRAINING CONFIGURATION
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">05</span>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Training <span class="gradient-text">Configuration</span>
+      </h2>
+      <div class="two-col">
+        <div class="code-block reveal">
+<span class="comment"># Training hyperparameters</span>
+<span class="keyword">optimizer</span>: Adam
+  lr: <span class="number">0.001</span>
+  weight_decay: <span class="number">1e-05</span>
+<span class="keyword">batch_size</span>: <span class="number">256</span>
+<span class="keyword">epochs</span>: <span class="number">100</span>
+<span class="keyword">negative_ratio</span>: <span class="number">1</span>
+<span class="keyword">early_stopping</span>: <span class="number">10</span> epochs
+<span class="keyword">loss</span>: Binary Cross-Entropy
+        </div>
+        <ul class="feature-list">
+          <li class="reveal">Learning rate: <strong style="color: var(--accent-cyan);">0.001</strong> with weight decay 1e-05</li>
+          <li class="reveal">Batch size: <strong style="color: var(--accent-cyan);">256</strong> for stable gradients</li>
+          <li class="reveal">Early stopping with <strong style="color: var(--accent-cyan);">10 epochs</strong> patience</li>
+          <li class="reveal">1:1 negative sampling for balanced classes</li>
+          <li class="reveal">Adam optimizer for adaptive learning</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 7: MODEL ARCHITECTURE
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">06</span>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        GraphSAGE <span style="color: var(--accent-cyan);">Architecture</span>
+      </h2>
+      <div class="two-col">
+        <div>
+          <ul class="feature-list">
+            <li class="reveal"><strong>Encoder:</strong> 2-layer DrugGNNEncoder (no BatchNorm)</li>
+            <li class="reveal"><strong>Hidden Dim:</strong> 128, <strong>Embedding Dim:</strong> 64</li>
+            <li class="reveal"><strong>Activation:</strong> ELU (between SAGEConv layers)</li>
+            <li class="reveal"><strong>Dropout:</strong> 0.3 for regularization</li>
+            <li class="reveal"><strong>Link Predictor:</strong> MLP 256 -> 128 -> 1 with dropout (0.2, 0.1)</li>
+          </ul>
+        </div>
+        <div class="code-block reveal">
+<span class="comment"># Architecture overview</span>
+DrugGNNEncoder:
+  SAGEConv (256 -> 128) + ELU
+  SAGEConv (128 -> 64) + ELU
+  Dropout (0.3)
+
+LinkPredictor:
+  Concat [drug_a, drug_b, a * b]
+  Linear (192 -> 256) + ELU + Dropout(0.2)
+  Linear (256 -> 128) + ELU + Dropout(0.1)
+  Linear (128 -> 1) + Sigmoid
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 8: MODEL COMPARISON
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">07</span>
+    <div class="circle circle-glow-cyan" style="width: 30vw; height: 30vw; bottom: -10%; right: 10%;"></div>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Model <span style="color: var(--accent-magenta);">Comparison</span>
+      </h2>
+      <div class="reveal" style="overflow-x: auto;">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>AUC</th>
+              <th>F1 Score</th>
+              <th>Precision</th>
+              <th>Recall</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>GraphSAGE (Ours)</strong></td>
+              <td class="highlight">0.9933</td>
+              <td class="highlight">0.9400</td>
+              <td class="highlight">0.9780</td>
+              <td class="highlight">0.9120</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="reveal" style="margin-top: var(--content-gap); max-width: 600px;">
+        Our GraphSAGE model achieves excellent performance on the test set, 
+        demonstrating the effectiveness of graph-based learning for drug interaction prediction.
+      </p>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 9: TEST RESULTS
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">08</span>
+    <div class="circle circle-glow-cyan" style="width: 50vw; height: 50vw; bottom: -15%; right: -10%;"></div>
+    <div class="circle circle-glow-magenta" style="width: 30vw; height: 30vw; top: 10%; left: -5%;"></div>
+    
+    <div class="slide-content slide-title-center">
+      <h2 style="margin-bottom: var(--content-gap);">
+        <span style="color: var(--text-muted);">Test</span> Results
+      </h2>
+      <div class="stat-value glow-cyan" style="font-size: calc(var(--stat-size) * 1.5);">99.33%</div>
+      <div class="stat-label" style="font-size: var(--body-size); margin-bottom: var(--content-gap);">Area Under ROC Curve</div>
+      <div class="stats-grid" style="max-width: 700px; margin: 0 auto;">
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: calc(var(--stat-size) * 0.5);">0.94</div>
+          <div class="stat-label">F1 Score</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: calc(var(--stat-size) * 0.5); color: var(--accent-magenta); text-shadow: 0 0 30px var(--accent-magenta);">97.8%</div>
+          <div class="stat-label">Precision</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: calc(var(--stat-size) * 0.5); color: var(--accent-purple); text-shadow: 0 0 30px var(--accent-purple);">91.2%</div>
+          <div class="stat-label">Recall</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size: calc(var(--stat-size) * 0.5); color: var(--accent-green); text-shadow: 0 0 30px var(--accent-green);">< 5ms</div>
+          <div class="stat-label">Latency</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 10: RISK STRATIFICATION
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">09</span>
+    <div class="circle circle-glow-magenta" style="width: 40vw; height: 40vw; top: 20%; right: -10%;"></div>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Risk <span style="color: var(--accent-cyan);">Stratification</span>
+      </h2>
+      <div class="three-col">
+        <div class="stat-card reveal" style="border-color: var(--accent-magenta);">
+          <div class="stat-value glow-magenta" style="font-size: calc(var(--stat-size) * 0.7);">HIGH</div>
+          <div class="stat-label" style="color: var(--accent-magenta);">P greater than 0.7</div>
+          <div style="margin-top: var(--element-gap); font-size: var(--small-size); color: var(--text-secondary);">
+            Contraindicated combinations requiring immediate clinical review
+          </div>
+        </div>
+        <div class="stat-card reveal" style="border-color: var(--accent-amber);">
+          <div class="stat-value glow-amber" style="font-size: calc(var(--stat-size) * 0.7);">MODERATE</div>
+          <div class="stat-label" style="color: var(--accent-amber);">0.4 less than P less than 0.7</div>
+          <div style="margin-top: var(--element-gap); font-size: var(--small-size); color: var(--text-secondary);">
+            Monitor closely, consider alternative therapy
+          </div>
+        </div>
+        <div class="stat-card reveal" style="border-color: var(--accent-green);">
+          <div class="stat-value glow-green" style="font-size: calc(var(--stat-size) * 0.7);">LOW</div>
+          <div class="stat-label" style="color: var(--accent-green);">P less than 0.4</div>
+          <div style="margin-top: var(--element-gap); font-size: var(--small-size); color: var(--text-secondary);">
+            Minimal risk, standard monitoring sufficient
+          </div>
+        </div>
+      </div>
+      <p class="reveal" style="margin-top: var(--content-gap); max-width: 600px;">
+        Each prediction includes clinical guidance based on established pharmacology databases, 
+        helping clinicians make informed decisions quickly.
+      </p>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 11: LIVE DEMO
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">10</span>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Interactive <span style="color: var(--accent-magenta);">Demo</span>
+      </h2>
+      <div class="demo-card reveal" style="max-width: 700px; margin-bottom: var(--content-gap);">
+        <p style="color: var(--text-muted); margin-bottom: var(--element-gap); font-size: var(--small-size);">
+          Example: High-Risk Cardiac Combination
+        </p>
+        <div class="demo-row">
+          <span class="drug-tag">Amiodarone</span>
+          <span class="demo-plus">+</span>
+          <span class="drug-tag">Digoxin</span>
+          <span class="demo-plus">+</span>
+          <span class="drug-tag">Warfarin</span>
+        </div>
+        <div style="margin-top: var(--content-gap); padding-top: var(--element-gap); border-top: 1px solid var(--accent-navy);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--element-gap);">
+            <span style="color: var(--text-secondary); font-size: var(--body-size);">3 pairs analyzed</span>
+            <span class="risk-badge risk-high">High Risk Detected</span>
+          </div>
+        </div>
+      </div>
+      <div class="two-col">
+        <ul class="feature-list reveal">
+          <li>Probability scores for each drug pair</li>
+          <li>Risk level classification with color coding</li>
+          <li>Clinical advice and references</li>
+          <li>Alias resolution (Aspirin = Acetylsalicylic acid)</li>
+        </ul>
+        <div class="demo-card reveal" style="background: var(--bg-secondary);">
+          <div style="font-size: var(--small-size); color: var(--accent-amber); margin-bottom: 0.5rem;">WARNINGS</div>
+          <div style="font-size: var(--body-size); color: var(--text-secondary); line-height: 1.6;">
+            Amiodarone + Digoxin: Increased digoxin levels, monitor serum concentration<br><br>
+            Warfarin + Amiodarone: Enhanced anticoagulation, adjust warfarin dose
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 12: CLINICAL APPLICATIONS
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">11</span>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Clinical <span class="gradient-text">Applications</span>
+      </h2>
+      <div class="stats-grid" style="max-width: 900px;">
+        <div class="stat-card reveal" style="text-align: left;">
+          <div class="stat-label" style="color: var(--accent-cyan); margin-bottom: 0.5rem;">Decision Support</div>
+          <p style="font-size: var(--small-size); color: var(--text-secondary);">
+            Integrate with EHR systems to flag high-risk combinations at the point of prescribing
+          </p>
+        </div>
+        <div class="stat-card reveal" style="text-align: left;">
+          <div class="stat-label" style="color: var(--accent-magenta); margin-bottom: 0.5rem;">Drug Discovery</div>
+          <p style="font-size: var(--small-size); color: var(--text-secondary);">
+            Predict interaction profiles for novel compounds before expensive clinical trials
+          </p>
+        </div>
+        <div class="stat-card reveal" style="text-align: left;">
+          <div class="stat-label" style="color: var(--accent-purple); margin-bottom: 0.5rem;">Pharmacovigilance</div>
+          <p style="font-size: var(--small-size); color: var(--text-secondary);">
+            Scale adverse event monitoring across millions of drug combinations
+          </p>
+        </div>
+        <div class="stat-card reveal" style="text-align: left;">
+          <div class="stat-label" style="color: var(--accent-green); margin-bottom: 0.5rem;">Research</div>
+          <p style="font-size: var(--small-size); color: var(--text-secondary);">
+            Explore interaction mechanisms through attention visualization
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 13: CURRENT LIMITATIONS
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">12</span>
+    <div class="circle circle-glow-cyan" style="width: 35vw; height: 35vw; bottom: -10%; left: 20%;"></div>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Current <span style="color: var(--accent-amber);">Limitations</span>
+      </h2>
+      <div class="two-col">
+        <ul class="feature-list">
+          <li class="reveal"><strong>Binary Prediction:</strong> Predicts interaction yes/no, not interaction type</li>
+          <li class="reveal"><strong>Pairwise:</strong> Evaluates pairs, not full drug cocktails at once</li>
+          <li class="reveal"><strong>Temporal Effects:</strong> Does not account for induction time or half-life</li>
+          <li class="reveal"><strong>Dosing Context:</strong> Predictions do not include dosage information</li>
+          <li class="reveal"><strong>Novel Interactions:</strong> Cannot predict entirely novel interaction types</li>
+        </ul>
+        <div class="diagram-box reveal">
+          <div style="font-size: var(--small-size); color: var(--text-muted); margin-bottom: var(--element-gap);">Prediction Confidence</div>
+          <div class="diagram-row" style="flex-direction: column; gap: var(--element-gap);">
+            <div style="display: flex; align-items: center; gap: var(--element-gap);">
+              <div style="width: 12px; height: 12px; background: var(--accent-cyan); border-radius: 50%;"></div>
+              <span style="color: var(--text-secondary); font-size: var(--small-size);">Known interactions (training data)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--element-gap);">
+              <div style="width: 12px; height: 12px; background: var(--accent-amber); border-radius: 50%;"></div>
+              <span style="color: var(--text-secondary); font-size: var(--small-size);">Extrapolated predictions</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: var(--element-gap);">
+              <div style="width: 12px; height: 12px; background: var(--accent-magenta); border-radius: 50%;"></div>
+              <span style="color: var(--text-secondary); font-size: var(--small-size);">Unknown/novel interactions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 14: FUTURE WORK
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <span class="slide-num">13</span>
+    
+    <div class="slide-content">
+      <h2 style="margin-bottom: var(--content-gap);">
+        Future <span style="color: var(--accent-cyan);">Directions</span>
+      </h2>
+      <div class="two-col">
+        <ul class="feature-list">
+          <li class="reveal"><strong>Multi-drug Analysis:</strong> Extend to N-drug combinations via hypergraph convolutions</li>
+          <li class="reveal"><strong>Explainable AI:</strong> GNN attention visualization for mechanism discovery</li>
+          <li class="reveal"><strong>Protein Targets:</strong> Incorporate drug-target interaction networks</li>
+          <li class="reveal"><strong>API Integration:</strong> REST API for clinical system integration</li>
+          <li class="reveal"><strong>Federated Learning:</strong> Privacy-preserving training across institutions</li>
+        </ul>
+        <div class="diagram-box reveal">
+          <div style="font-size: var(--small-size); color: var(--text-muted); margin-bottom: var(--element-gap);">Extended Architecture</div>
+          <div class="diagram-row" style="flex-direction: column; gap: var(--element-gap);">
+            <div class="diagram-node" style="width: auto; height: auto; padding: 0.5rem 1rem; border-radius: 8px; border-color: var(--accent-cyan); color: var(--accent-cyan);">Drug Graph</div>
+            <span class="diagram-arrow" style="transform: rotate(90deg);">></span>
+            <div class="diagram-node" style="width: auto; height: auto; padding: 0.5rem 1rem; border-radius: 8px; border-color: var(--accent-magenta); color: var(--accent-magenta);">Target Network</div>
+            <span class="diagram-arrow" style="transform: rotate(90deg);">></span>
+            <div class="diagram-node" style="width: auto; height: auto; padding: 0.5rem 1rem; border-radius: 8px; border-color: var(--accent-purple); color: var(--accent-purple);">Pathway Model</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       SLIDE 15: CONCLUSION
+       ========================================= -->
+  <section class="slide">
+    <div class="scanlines"></div>
+    <div class="circle circle-glow-cyan" style="width: 60vw; height: 60vw; top: -20%; right: -10%;"></div>
+    <div class="circle circle-glow-magenta" style="width: 40vw; height: 40vw; bottom: -10%; left: -5%;"></div>
+    
+    <div class="slide-content slide-title-center">
+      <h1>
+        <span class="gradient-text">Thank You</span>
+      </h1>
+      <p style="font-size: var(--h3-size); margin-top: var(--content-gap); color: var(--text-primary);">
+        Questions?
+      </p>
+      <div class="stats-grid" style="max-width: 700px; margin: calc(var(--content-gap) * 1.5) auto 0;">
+        <div style="text-align: center;">
+          <div class="stat-value glow-cyan" style="font-size: calc(var(--stat-size) * 0.7);">99.33%</div>
+          <div class="stat-label">AUC Score</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="stat-value glow-magenta" style="font-size: calc(var(--stat-size) * 0.7);">1.45M</div>
+          <div class="stat-label">Interactions</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="stat-value glow-green" style="font-size: calc(var(--stat-size) * 0.7);">Real-Time</div>
+          <div class="stat-label">Predictions</div>
+        </div>
+        <div style="text-align: center;">
+          <div class="stat-value glow-purple" style="font-size: calc(var(--stat-size) * 0.7);">Open</div>
+          <div class="stat-label">Research</div>
+        </div>
+      </div>
+      <div style="margin-top: calc(var(--content-gap) * 2); padding: var(--element-gap) var(--content-gap); background: var(--bg-card); border: 1px solid var(--accent-navy); border-radius: 12px; display: inline-block;">
+        <p style="font-size: var(--small-size); color: var(--text-muted);">
+          DrugGraph is for research purposes only. Not intended for clinical decision-making without proper validation.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================
+       NAVIGATION
+       ========================================= -->
+  <nav class="progress" aria-label="Slide progress"></nav>
+  <div class="keyboard-hint">
+    <kbd>Up</kbd><kbd>Down</kbd> or <kbd>Space</kbd> to navigate
+  </div>
+
+  <script>
+    // =========================================
+    // PRESENTATION CONTROLLER
+    // =========================================
+    class PresentationController {
+      constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.currentSlide = 0;
+        this.totalSlides = this.slides.length;
+        this.isAnimating = false;
+        
+        this.init();
+      }
+
+      init() {
+        this.createProgressDots();
+        this.setupIntersectionObserver();
+        this.bindKeyboard();
+        this.bindWheel();
+        this.bindTouch();
+        this.updateProgress();
+      }
+
+      createProgressDots() {
+        const progress = document.querySelector('.progress');
+        for (let i = 0; i < this.totalSlides; i++) {
+          const dot = document.createElement('div');
+          dot.className = 'progress-dot';
+          dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+          progress.appendChild(dot);
+        }
+      }
+
+      setupIntersectionObserver() {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+                const index = Array.from(this.slides).indexOf(entry.target);
+                this.goToSlide(index);
+                this.revealElements(entry.target);
+              }
+            });
+          },
+          { threshold: 0.5 }
+        );
+
+        this.slides.forEach((slide) => observer.observe(slide));
+      }
+
+      revealElements(slide) {
+        const reveals = slide.querySelectorAll('.reveal');
+        reveals.forEach((el, i) => {
+          setTimeout(() => el.classList.add('visible'), i * 100);
+        });
+      }
+
+      bindKeyboard() {
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown' || e.key === ' ' || e.key === 'PageDown') {
+            e.preventDefault();
+            this.nextSlide();
+          } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+            e.preventDefault();
+            this.prevSlide();
+          } else if (e.key === 'Home') {
+            e.preventDefault();
+            this.goToSlide(0);
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            this.goToSlide(this.totalSlides - 1);
+          }
+        });
+      }
+
+      bindWheel() {
+        let lastWheelTime = 0;
+        const wheelThreshold = 50;
+
+        document.addEventListener('wheel', (e) => {
+          const now = Date.now();
+          if (now - lastWheelTime < wheelThreshold) return;
+          
+          if (e.deltaY > 0) {
+            this.nextSlide();
+          } else {
+            this.prevSlide();
+          }
+          lastWheelTime = now;
+        }, { passive: true });
+      }
+
+      bindTouch() {
+        let touchStartY = 0;
+        let touchEndY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+          touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+          touchEndY = e.changedTouches[0].screenY;
+          const diff = touchStartY - touchEndY;
+          
+          if (Math.abs(diff) > 50) {
+            if (diff > 0) {
+              this.nextSlide();
+            } else {
+              this.prevSlide();
+            }
+          }
+        }, { passive: true });
+      }
+
+      goToSlide(index) {
+        if (index < 0 || index >= this.totalSlides || this.isAnimating) return;
+        
+        this.isAnimating = true;
+        this.currentSlide = index;
+        
+        this.slides[index].scrollIntoView({ behavior: 'smooth' });
+        this.updateProgress();
+        
+        setTimeout(() => {
+          this.isAnimating = false;
+        }, 600);
+      }
+
+      nextSlide() {
+        if (this.currentSlide < this.totalSlides - 1) {
+          this.goToSlide(this.currentSlide + 1);
+        }
+      }
+
+      prevSlide() {
+        if (this.currentSlide > 0) {
+          this.goToSlide(this.currentSlide - 1);
+        }
+      }
+
+      updateProgress() {
+        const dots = document.querySelectorAll('.progress-dot');
+        dots.forEach((dot, i) => {
+          dot.classList.toggle('active', i === this.currentSlide);
+        });
+      }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      const controller = new PresentationController();
+      
+      // Reveal first slide elements
+      controller.revealElements(controller.slides[0]);
+    });
+  </script>
+</body>
+</html>

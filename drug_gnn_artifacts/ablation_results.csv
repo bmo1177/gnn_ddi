@@ -1,0 +1,6 @@
+arch,layers,val_auc
+GAT,2 (1-head),0.9811925434464296
+SAGE,3,0.981
+SAGE,2,0.9805
+GCN,3,0.979
+GCN,2,0.9526
