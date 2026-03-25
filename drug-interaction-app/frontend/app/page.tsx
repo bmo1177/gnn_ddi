@@ -7,6 +7,7 @@ import ResultCard from "@/components/ResultCard";
 import SummaryBanner from "@/components/SummaryBanner";
 import DrugDetailsModal from "@/components/DrugDetailsModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import { API_BASE_URL } from "@/lib/api-config";
 
 interface Interaction {
   drug_a: string;
@@ -119,7 +120,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetch("/api/health")
+    fetch(`${API_BASE_URL}/api/health`)
       .then((r) => {
         if (!r.ok) throw new Error("Service unavailable");
         return r.json();
@@ -154,7 +155,7 @@ export default function Home() {
     setLoading(true);
     setResults(null);
     try {
-      const res = await fetch("/api/check", {
+      const res = await fetch(`${API_BASE_URL}/api/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ drugs }),

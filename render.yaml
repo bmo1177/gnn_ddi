@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: gnn-ddi-backend
+    runtime: python
+    region: oregon
+    rootDir: drug-interaction-app/backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: MODEL_PATH
+        value: ./models/best_model.pt
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: CORS_ORIGINS
+        value: https://gnn-ddi-2l2p.vercel.app

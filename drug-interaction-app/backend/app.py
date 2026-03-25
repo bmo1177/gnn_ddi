@@ -181,7 +181,12 @@ def resolve_drug_name(name: str):
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"])
+# CORS for both local development and Vercel frontend
+CORS(app, origins=[
+    "http://localhost:3000",
+    "https://gnn-ddi-2l2p.vercel.app",  # Your Vercel URL
+    "https://*.vercel.app"  # Allow all Vercel preview deployments
+])
 
 
 @app.route('/api/health', methods=['GET'])
@@ -319,4 +324,6 @@ def check():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Render requires binding to 0.0.0.0:$PORT
+    port = int(os.getenv("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

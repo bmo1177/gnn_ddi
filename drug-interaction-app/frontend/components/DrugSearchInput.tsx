@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
+import { API_BASE_URL } from "@/lib/api-config";
 
 interface DrugSearchInputProps {
   onSelect: (drug: string) => void;
@@ -29,7 +30,7 @@ export default forwardRef<{ focus: () => void }, DrugSearchInputProps>(
           return;
         }
         try {
-          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`);
+          const res = await fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(q)}&limit=8`);
           const data = await res.json();
           const filtered = (data.results || []).filter(
             (name: string) => !addedDrugs.includes(name)
