@@ -372,8 +372,15 @@ edges are withheld. Performance on genuinely unseen drugs (inductive setting)
 may be lower. Second, negative edges are randomly sampled; many unknown pairs
 are simply untested, not confirmed non-interactions (open-world assumption), a
 limitation shared by all DDI benchmarks~\cite{ren2023}. Third, the model outputs
-a probability score, not a mechanistic explanation. Fourth, this tool is for
-research use only and does not constitute clinical advice.
+a probability score, not a mechanistic explanation. Fourth, all experiments are
+conducted on DrugBank only; performance on external datasets such as TWOSIDES
+or BioSNAP is unknown, and generalizability beyond DrugBank cannot be confirmed.
+Fifth, baseline AUC values in Table~\ref{tab:baselines} are taken from original
+papers which used different evaluation protocols (train/test splits, negative
+sampling strategies, and DrugBank versions); direct comparison should be
+interpreted with caution. Sixth, results are from a single training run without
+variance estimates, making statistical significance unclear. Seventh, this tool
+is for research use only and does not constitute clinical advice.
 
 \textbf{Deployment considerations.} Clinical deployment of DDI prediction tools
 requires regulatory clearance (e.g., FDA 510(k) or CE marking as a clinical
@@ -388,7 +395,14 @@ adverse event pairs, 1,300 side-effect types) to predict the \textit{type} of
 interaction rather than binary presence. (2) Integration with Neo4j for
 persistent, queryable storage of the interaction graph. (3) R-GCN~\cite{wu2021}
 for multi-relational modelling (pharmacokinetic vs. pharmacodynamic
-interactions). (4) Inductive evaluation on newly approved drugs.
+interactions). (4) Inductive evaluation on newly approved drugs. (5) Standardized
+benchmarking: re-evaluate all baseline methods under identical train/test splits
+and negative sampling protocols for fair comparison. (6) External dataset
+validation on TWOSIDES and BioSNAP to assess cross-dataset generalization.
+(7) Multi-seed evaluation reporting mean $\pm$ standard deviation over 5+
+random seeds to establish result reliability. (8) Feature sensitivity analysis
+ablation of Morgan fingerprint bit size (64--1024) and embedding dimension
+(32--128) to understand model sensitivity to hyperparameters.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Conclusion}
