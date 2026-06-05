@@ -90,11 +90,11 @@ systems are incomplete and difficult to scale. We present \textbf{DrugGraph}, a
 Graph Neural Network (GNN) framework that models drugs as nodes and known interactions
 as edges in a molecular knowledge graph, learning to predict dangerous drug pairs
 through link prediction. Using the DrugBank v5.1.15 database (19,842 drugs,
-1,455,278 interaction edges), we encode each drug as a 1024-bit Morgan fingerprint
+1,455,278 interaction edges), we encode each drug as a 256-bit Morgan fingerprint
 derived from its SMILES molecular structure, and train a two-layer GraphSAGE encoder
 with a symmetric MLP link predictor. Our model achieves a test
-AUC-ROC of \textbf{0.9933} and Average Precision of \textbf{0.9884}, outperforming
-published baselines including DeepDDI (0.920), SSI-DDI (0.961), and MHCADDI (0.974).
+AUC-ROC of \textbf{0.9933} and Average Precision of \textbf{0.9884}, achieving
+competitive performance relative to published baselines including DeepDDI (0.920), SSI-DDI (0.961), and MHCADDI (0.974).
 We further deploy the trained model as a full-stack web application (\textit{DrugGraph})
 enabling real-time interaction screening at the point of care. Ablation studies
 confirm GraphSAGE as the optimal architecture for this task. Code and artifacts
@@ -140,7 +140,7 @@ problem GNNs are specifically designed to solve.
 graph from DrugBank v5.1.15 with Morgan fingerprint node features; (2) train and
 evaluate three GNN architectures --- GCN~\cite{kipf2017}, GraphSAGE~\cite{hamilton2017},
 and GAT~\cite{velickovic2018} --- on transductive link prediction; (3) achieve
-state-of-the-art AUC of 0.9933, surpassing SSI-DDI~\cite{nyamabo2021} and
+competitive AUC of 0.9933 on DrugBank, comparable to SSI-DDI~\cite{nyamabo2021} and
 MHCADDI~\cite{deac2019}; and (4) deploy a real-time web application for clinical use.
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -148,23 +148,33 @@ MHCADDI~\cite{deac2019}; and (4) deploy a real-time web application for clinical
 % ─────────────────────────────────────────────────────────────────────────────
 
 \textbf{Classical DDI prediction.} Early methods relied on chemical fingerprint
-similarity~\cite{rogers2010} or biological target overlap. These approaches fail
-to capture higher-order relational patterns.
+similarity~\cite{rogers2010} or biological target overlap. Rule-based systems
+integrated into electronic health records check interactions against curated
+databases but remain incomplete, as DrugBank itself acknowledges that known
+interactions represent only a fraction of total possible DDIs. These approaches
+fail to capture higher-order relational patterns.
 
 \textbf{Deep learning baselines.} DeepDDI~\cite{ryu2018} first applied deep
 neural networks to SMILES-based DDI prediction (AUC 0.920). Deac et al.'s
 MHCADDI~\cite{deac2019} introduced graph co-attention on molecular graphs (AUC
 0.974). SSI-DDI~\cite{nyamabo2021} modelled substructure-substructure interactions
-achieving AUC 0.961 on DrugBank.
+achieving AUC 0.961 on DrugBank. More recently, Al-Rabeah and Lakizadeh~\cite{peng2022}
+explored graph neural network feature extraction for DDI event prediction, achieving
+AUC 0.981. Comprehensive benchmarks by Ren et al.~\cite{ren2023} confirm that
+GNN-based link prediction consistently outperforms pairwise classifiers, though
+they note that reported AUC values are sensitive to evaluation protocol choices
+including train/test splits and negative sampling strategies.
 
 \textbf{GNN-based approaches.} Decagon~\cite{zitnik2018} pioneered polypharmacy
 side-effect prediction using graph convolutions on a multi-relational network.
 KnowDDI~\cite{wang2024} recently introduced knowledge subgraph learning for
-interpretable DDI prediction. Comprehensive benchmarks by Ren et al.~\cite{ren2023}
-confirm that GNN-based link prediction consistently outperforms pairwise classifiers.
-Our work adopts the GraphSAGE inductive framework~\cite{hamilton2017}, which
-handles large sparse graphs efficiently and generalizes to newly added nodes ---
-a property essential for integrating newly approved drugs.
+interpretable DDI prediction, achieving strong performance while providing
+explanations for predicted interactions. Our work adopts the GraphSAGE
+inductive framework~\cite{hamilton2017}, which handles large sparse graphs
+efficiently and generalizes to newly added nodes --- a property essential for
+integrating newly approved drugs. Unlike methods that model interaction types
+explicitly, we focus on binary interaction prediction as a foundational task,
+with multi-type prediction identified as future work.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Methodology}
@@ -176,9 +186,13 @@ We use DrugBank v5.1.15 (March 2026 release)~\cite{wishart2018}, containing
 19,842 drug entries and 1,455,278 unique undirected interaction edges after
 de-duplication. Each drug with an available SMILES string (14,619/19,842; 73.7\%)
 is converted to a Morgan fingerprint~\cite{rogers2010}; the remaining drugs receive
-a deterministic random feature vector as fallback. The graph is highly dense
+a deterministic random feature vector as fallback. These 5,223 drugs without SMILES
+strings are predominantly biologics, natural products, and proprietary formulations
+for which structural representations are not publicly available. While the
+zero-vector fallback ensures all nodes participate in message passing, it may
+introduce bias toward drugs with well-characterized molecular structures. The graph is highly dense
 (mean degree $\mu = 146.7$, max degree 2,637 for Clozapine), which is consistent
-with known scale-free properties of biological interaction networks.
+with heavy-tailed degree distributions observed in biological interaction networks.
 
 \subsection{Graph Construction}
 
@@ -188,8 +202,10 @@ Each undirected edge $(v_i, v_j) \in \mathcal{E}$ encodes a known interaction.
 The node feature matrix $\mathbf{X} \in \mathbb{R}^{|\mathcal{V}| \times 256}$
 contains the 256-bit Morgan fingerprint (radius 2) of each drug, computed via
 RDKit~\cite{landrum2006}. The graph is split into train/validation/test edge sets
-(80/10/10) using stratified random link splitting with an equal number of negative
-edges sampled for the validation and test sets.
+(80/10/10) using random link splitting. For each split, negative edges (non-existent
+drug pairs) are sampled uniformly at random at a 1:1 ratio relative to positive edges.
+Negative edges are sampled once before training and held fixed across all epochs to
+ensure consistent evaluation.
 
 \subsection{GNN Architecture}
 
@@ -241,13 +257,13 @@ in approximately 60 minutes on an Intel i7-13th generation processor (16 GB RAM)
 
 Table~\ref{tab:baselines} compares our model against published baselines on
 DrugBank. Our GraphSAGE achieves AUC-ROC of \textbf{0.9933} and Average Precision
-of \textbf{0.9884}, surpassing all prior work. The classification report on the
+of \textbf{0.9884} on DrugBank under our evaluation protocol. The classification report on the
 test set (Table~\ref{tab:classification}) shows balanced precision and recall.
 
 \begin{table}[H]
 \centering
 \small
-\caption{AUC-ROC comparison on DrugBank. $\dagger$ results from original papers.}
+\caption{AUC-ROC comparison on DrugBank. $\dagger$ results reported in original papers using different evaluation protocols.}
 \label{tab:baselines}
 \begin{tabular}{lcc}
 \toprule
@@ -324,6 +340,10 @@ The trained model is deployed as a full-stack web application. The backend
 request. The frontend (Next.js, Tailwind CSS) provides a pharmacist-facing
 interface with fuzzy drug name search, real-time interaction analysis, risk
 stratification (HIGH/MODERATE/LOW), and session history.
+Risk thresholds are set at $\hat{p} \geq 0.7$ (HIGH), $0.4 \leq \hat{p} < 0.7$
+(MODERATE), and $\hat{p} < 0.4$ (LOW), chosen to balance sensitivity for
+clinically significant interactions against alert fatigue, consistent with
+recommended DDI alerting practices~\cite{glassman2002}.
 \begin{figure}[ht]
     \centering
     \includegraphics[width=0.95\linewidth]{evaluation.png}
@@ -355,6 +375,14 @@ limitation shared by all DDI benchmarks~\cite{ren2023}. Third, the model outputs
 a probability score, not a mechanistic explanation. Fourth, this tool is for
 research use only and does not constitute clinical advice.
 
+\textbf{Deployment considerations.} Clinical deployment of DDI prediction tools
+requires regulatory clearance (e.g., FDA 510(k) or CE marking as a clinical
+decision support system), integration with existing electronic health record
+workflows, and clear liability frameworks. Our web application demonstrates
+technical feasibility but has not undergone clinical validation or regulatory
+review. Responsible deployment would require prospective evaluation against
+clinical pharmacist assessments and integration with hospital formulary systems.
+
 \textbf{Future work.} (1) Multi-label prediction using TWOSIDES labels (63k
 adverse event pairs, 1,300 side-effect types) to predict the \textit{type} of
 interaction rather than binary presence. (2) Integration with Neo4j for
@@ -367,7 +395,7 @@ interactions). (4) Inductive evaluation on newly approved drugs.
 % ─────────────────────────────────────────────────────────────────────────────
 
 We presented DrugGraph, a GNN-based framework for drug-drug interaction prediction
-that achieves state-of-the-art AUC-ROC of 0.9933 on DrugBank v5.1.15. By modelling
+that achieves competitive AUC-ROC of 0.9933 on DrugBank v5.1.15. By modelling
 the problem as link prediction on a molecular knowledge graph with Morgan fingerprint
 node features and a GraphSAGE encoder, we demonstrate that relational graph learning
 significantly outperforms classical pairwise deep learning approaches. The full
@@ -375,6 +403,14 @@ deployment as a pharmacist-facing web application demonstrates the practical via
 of GNN-based clinical decision support. This work directly addresses the polypharmacy
 challenge in community pharmacy and provides a reproducible, open-source foundation
 for further research in biomedical graph learning.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section*{Data and Code Availability}
+% ─────────────────────────────────────────────────────────────────────────────
+The trained model artifacts, training code, and web application source code are
+publicly available at \url{https://github.com/[username]/druggraph}. The DrugBank
+database is available under an academic license from
+\url{https://go.drugbank.com/releases/latest#open-data}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section*{Acknowledgements}
