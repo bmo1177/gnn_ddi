@@ -14,6 +14,10 @@ A Graph Neural Network system that predicts dangerous drug-drug interactions (DD
 | Test AUC-ROC | 0.9933 |
 | Total parameters | 164,545 |
 
+### Test Set Evaluation
+
+![Test Set Evaluation — ROC Curve and Confusion Matrix](drug_gnn_artifacts/evaluation.png)
+
 ## Architecture
 
 ```
@@ -29,6 +33,12 @@ Drug SMILES → Morgan Fingerprints (256-dim)
 ```
 
 **Supported GNN backends:** GraphSAGE (selected), GCN, GAT — configurable via `architecture` parameter.
+
+### Hub Drug Neighborhood
+
+Clozapine — the highest-degree node with 2,637 known interactions — and its local neighborhood:
+
+![Hub drug neighborhood: Clozapine (degree 2637)](drug_gnn_artifacts/subgraph.png)
 
 ## Project Structure
 
@@ -123,6 +133,12 @@ npm run dev                                            # http://localhost:3000
 
 ## Training Configuration
 
+### Training Curves
+
+![Training — Loss and Validation Metrics](drug_gnn_artifacts/training_curves.png)
+
+### Hyperparameters
+
 | Parameter | Value |
 |-----------|-------|
 | Optimizer | Adam (lr=1e-3, weight_decay=1e-5) |
@@ -133,6 +149,20 @@ npm run dev                                            # http://localhost:3000
 | Gradient clipping | max_norm=1.0 |
 | Loss | BCEWithLogitsLoss |
 | Train/Val/Test | 80% / 10% / 10% |
+
+### Ablation Study
+
+SAGE 2-layer was chosen for the best balance of performance and simplicity.
+
+![Ablation Study — Architecture Comparison](drug_gnn_artifacts/ablation.png)
+
+| Architecture | Layers | Val AUC |
+|-------------|--------|---------|
+| GAT | 2 (1-head) | 0.9812 |
+| SAGE | 3 | 0.9810 |
+| **SAGE** | **2** | **0.9805** |
+| GCN | 3 | 0.9790 |
+| GCN | 2 | 0.9526 |
 
 ## Limitations
 
@@ -150,6 +180,10 @@ npm run dev                                            # http://localhost:3000
 - Federated learning for privacy-preserving multi-institution training
 
 ## Dataset
+
+### Exploratory Data Analysis
+
+![DrugBank Graph — EDA: Degree Distribution, Scale-Free Check, Top Hub Drugs](drug_gnn_artifacts/eda.png)
 
 - **Source:** DrugBank Full Database v5.1.15 (licensed)
 - **Features:** Morgan fingerprints (radius 2, 256 bits) via RDKit
