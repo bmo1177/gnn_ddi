@@ -1,43 +1,86 @@
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# AGENTS.md — gnn_ddi
 
-This project is indexed by GitNexus as **gnn_ddi** (295 symbols, 351 relationships, 3 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+## Project at a Glance
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+DrugGraph — predicts drug-drug interactions using GraphSAGE on a DrugBank molecular graph. Three components:
 
-## Always Do
+| Component | Path | Stack |
+|-----------|------|-------|
+| Training | `drug_interaction_gnn_local_cpu_final_run3.ipynb` (root) | PyTorch + PyG + RDKit |
+| Backend | `drug-interaction-app/backend/app.py` (single file, 329 lines) | Flask + PyTorch inference |
+| Frontend | `drug-interaction-app/frontend/` | Next.js 16 + React 19 + Tailwind 4 |
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+## Critical Gotchas
 
-## Never Do
+### Model artifacts live in two places
 
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+- `drug_gnn_artifacts/` — training output (source of truth)
+- `drug-interaction-app/backend/models/` — copy used by backend at runtime
 
-## Resources
+The backend hardcodes `MODEL_DIR = ./models/` relative to `app.py`. If you retrain, you **must** copy artifacts:
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/gnn_ddi/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/gnn_ddi/clusters` | All functional areas |
-| `gitnexus://repo/gnn_ddi/processes` | All execution flows |
-| `gitnexus://repo/gnn_ddi/process/{name}` | Step-by-step execution trace |
+```bash
+cp -r drug_gnn_artifacts/* drug-interaction-app/backend/models/
+```
 
-## CLI
+### Dual API proxy strategy (easy to miss)
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+The frontend proxies `/api/*` to Flask via **two independent mechanisms**:
 
-<!-- gitnexus:end -->
+1. **`next.config.ts` rewrites** — client-side fetch → `NEXT_PUBLIC_API_URL` (default `http://localhost:5000`)
+2. **Next.js API route handlers** (`app/api/`) — server-side proxy → `BACKEND_URL` (default `http://localhost:5000`), with **mock fallback** if backend is unreachable
+
+The frontend works without the backend running (returns mock data).
+
+### Backend env vars are mostly unused in code
+
+`render.yaml` defines `MODEL_PATH` and `CORS_ORIGINS`, but `app.py` does **not** read them. The model path is hardcoded. Don't rely on those env vars for local development.
+
+## Commands
+
+### Frontend
+
+```bash
+cd drug-interaction-app/frontend
+npm run dev       # dev server on http://localhost:3000
+npm run build     # production build
+npm run lint      # ESLint 9 (flat config, eslint-config-next)
+```
+
+No `npm test` — the project has **zero tests** (no pytest, no jest, no vitest).
+
+### Backend
+
+```bash
+cd drug-interaction-app/backend
+python app.py                              # dev server on :5000
+gunicorn app:app --bind 0.0.0.0:5000       # production
+```
+
+Requires Python 3.11.0 (see `runtime.txt`). Install deps: `pip install -r requirements.txt`.
+
+### Training (Jupyter)
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install torch-geometric rdkit scikit-learn matplotlib seaborn tqdm networkx pandas numpy jupyter
+jupyter notebook drug_interaction_gnn_local_cpu_final_run3.ipynb
+```
+
+Requires DrugBank XML (licensed). Update `CONFIG['drugbank_path']` in notebook. ~1 hour on i7 CPU.
+
+### GitNexus
+
+```bash
+npx gitnexus analyze          # rebuild knowledge graph
+npx gitnexus status           # check if index is stale
+```
+
+## Architecture Notes
+
+- **Backend is a single file** (`app.py`) — no modules, no blueprints, no `__init__.py`
+- **7 frontend components** under `components/` — all in TypeScript
+- **No CI/CD pipelines** — deploys via Render (backend) and Vercel (frontend)
+- **No pre-commit hooks**, no formatter, no typecheck beyond ESLint
+- **Notebooks follow pattern:** `drug_interaction_gnn_<variant>.ipynb` — active one at root, old ones in `previous_notebooks_runs/`
+- **GitNexus** indexes 295 symbols, 351 relationships, 3 flows — run `npx gitnexus analyze` if tools report stale index
