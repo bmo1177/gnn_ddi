@@ -14,38 +14,12 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import SAGEConv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 # ---------------------------------------------------------------------------
 # Model classes — must match training exactly
 # ---------------------------------------------------------------------------
-
-class DrugGNNEncoder(nn.Module):
-    """GraphSAGE encoder, 2 layers, NO BatchNorm."""
-    def __init__(self, in_channels, hidden_channels, out_channels,
-                 num_layers=2, dropout=0.3, architecture='sage'):
-        super().__init__()
-        self.architecture = architecture
-        self.dropout = dropout
-        self.convs = nn.ModuleList()
-        dims = [in_channels] + [hidden_channels] * (num_layers - 1) + [out_channels]
-        for i in range(num_layers):
-            in_d, out_d = dims[i], dims[i + 1]
-            if architecture == 'sage':
-                self.convs.append(SAGEConv(in_d, out_d))
-            # Only sage is used — kept minimal
-        # No BatchNorm — not needed at this scale, avoids eval/train mode issues
-
-    def forward(self, x, edge_index):
-        for i, conv in enumerate(self.convs):
-            x = conv(x, edge_index)
-            if i < len(self.convs) - 1:
-                x = F.elu(x)
-                x = F.dropout(x, p=self.dropout, training=self.training)
-        return x
-
 
 class LinkPredictor(nn.Module):
     """MLP scoring drug pairs."""
@@ -83,42 +57,24 @@ def load_model():
     with open(os.path.join(MODEL_DIR, 'name_to_idx.pkl'), 'rb') as f:
         name_to_idx = pickle.load(f)
 
-    # Graph data
-    node_features = torch.load(os.path.join(MODEL_DIR, 'node_features.pt'),
-                               map_location='cpu', weights_only=False)
-    edge_index = torch.load(os.path.join(MODEL_DIR, 'edge_index.pt'),
-                            map_location='cpu', weights_only=False)
+    # Load pre-computed embeddings directly (4.8MB) instead of
+    # recomputing from edge_index (44MB) + node_features (19MB)
+    Z = torch.load(os.path.join(MODEL_DIR, 'embeddings.pt'),
+                   map_location='cpu', weights_only=False)
 
-    # Build models
-    encoder = DrugGNNEncoder(
-        in_channels=node_features.shape[1],
-        hidden_channels=config['hidden_dim'],
-        out_channels=config['embedding_dim'],
-        num_layers=config['num_gnn_layers'],
-        dropout=config.get('dropout', 0.3),
-        architecture=config['architecture'],
-    )
+    # Build predictor and load weights
     predictor = LinkPredictor(config['embedding_dim'])
-
-    # Load weights
     checkpoint = torch.load(os.path.join(MODEL_DIR, 'best_model.pt'),
                             map_location='cpu', weights_only=False)
-    encoder.load_state_dict(checkpoint['encoder'])
     predictor.load_state_dict(checkpoint['predictor'])
-
-    encoder.eval()
     predictor.eval()
 
-    # Precompute all drug embeddings
-    with torch.no_grad():
-        Z = encoder(node_features, edge_index)
-
     print(f"Model loaded: {len(drug_names):,} drugs, embeddings shape {list(Z.shape)}")
-    return drug_names, name_to_idx, encoder, predictor, Z
+    return drug_names, name_to_idx, predictor, Z
 
 
 # Global state
-drug_names, name_to_idx, encoder, predictor, Z = load_model()
+drug_names, name_to_idx, predictor, Z = load_model()
 drug_names_lower = [n.lower() for n in drug_names]
 
 # ---------------------------------------------------------------------------
