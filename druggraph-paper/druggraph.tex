@@ -346,15 +346,18 @@ clinically significant interactions against alert fatigue, consistent with
 recommended DDI alerting practices~\cite{glassman2002}.
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=0.95\linewidth]{evaluation.png}
-    \caption{Web application interface showing clinical scenarios.}
-    \label{fig:app}
+    \includegraphics[width=0.95\linewidth]{subgraph.png}
+    \caption{Neighborhood of the hub drug Clozapine (degree 2,637) showing
+    1-hop (green) and 2-hop (purple) neighbors. Two message-passing layers
+    suffice to aggregate structural information from this local subgraph.}
+    \label{fig:subgraph}
 \end{figure}
 
-Figure~\ref{fig:app} illustrates two clinical scenarios tested on the application.
-In the cardiac polypharmacy case (Amiodarone + Digoxin + Warfarin), all three
-pairs are correctly flagged as HIGH risk (97.4\%, 82\%, 77\%), consistent with
-known clinical contraindications documented in DrugBank.
+Figure~\ref{fig:subgraph} shows the local neighborhood of Clozapine, a hub drug
+with 2,637 interaction edges. With only two GNN layers, each node aggregates
+information from its 1-hop and 2-hop neighbors---covering the vast majority of
+relevant structural context. This explains why a shallow 2-layer GraphSAGE
+suffices for the DDI prediction task on this dense graph.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Discussion}
@@ -400,7 +403,7 @@ benchmarking: re-evaluate all baseline methods under identical train/test splits
 and negative sampling protocols for fair comparison. (6) External dataset
 validation on TWOSIDES and BioSNAP to assess cross-dataset generalization.
 (7) Multi-seed evaluation reporting mean $\pm$ standard deviation over 5+
-random seeds to establish result reliability. (8) Feature sensitivity analysis
+random seeds to establish result reliability. (8) Feature sensitivity analysis:
 ablation of Morgan fingerprint bit size (64--1024) and embedding dimension
 (32--128) to understand model sensitivity to hyperparameters.
 
@@ -422,7 +425,7 @@ for further research in biomedical graph learning.
 \section*{Data and Code Availability}
 % ─────────────────────────────────────────────────────────────────────────────
 The trained model artifacts, training code, and web application source code are
-publicly available at \url{https://github.com/[username]/druggraph}. The DrugBank
+publicly available at \url{https://github.com/bmo1177/gnn_ddi}. The DrugBank
 database is available under an academic license from
 \url{https://go.drugbank.com/releases/latest#open-data}.
 
